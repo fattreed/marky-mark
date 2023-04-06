@@ -17,18 +17,16 @@ pub fn scan_file(path: &str) -> Vec<Token> {
 
 pub fn scan(tokens: &mut Vec<Token>, source: &str) {
     let mut bytes = source.as_bytes();
-    let mut start: usize = 0;
+    let mut start: usize;
     let mut current: usize = 0;
-    while current < bytes.len() {
+    while current < bytes.len() - 1 {
         start = current;
-        let prev = current;
-        let b = bytes[prev];
         current += 1;
-
+        let b = bytes[current];
         let token = match b {
-            b'#' => header(b, bytes, start, &mut current),
+            b'#' => header(bytes, start, &mut current),
             b'\t' | b' ' | b'\r'| b'\n' => None,
-            _ => None,
+            _ => paragraph(bytes, start, &mut current),
         };
         
         match token {
@@ -39,22 +37,41 @@ pub fn scan(tokens: &mut Vec<Token>, source: &str) {
 }
 
 fn peek(bytes: &[u8], current: usize) -> u8 {  
-    if current <= bytes.len() {
+    if current < bytes.len() - 1 {
         bytes[current + 1]
     } else {
         b'\0'
     }
 }
 
-fn header(b: u8, bytes: &[u8], start: usize, current: &mut usize) -> Option<Token> {
-    let mut num_of_hashtags = 1;
+fn paragraph(bytes: &[u8], start: usize, current: &mut usize) -> Option<Token> {
+    while peek(bytes, *current) != b'\n' && peek(bytes, *current) != b'\0' {
+        *current += 1;
+    }
+
+    let p_bytes = &bytes[start..=*current];
+    let text = String::from_utf8(p_bytes.to_vec());
+    
+    match text {
+        Ok(t) => Some(Token { text: t.trim().to_string(), tag: Tag::P }),
+        Err(_) => None,
+    }
+}
+
+fn header(bytes: &[u8], start: usize, current: &mut usize) -> Option<Token> {
+    let mut num_of_hashtags = 0;
     while bytes[*current] == b'#' {
         *current += 1;
         num_of_hashtags += 1;
     }
 
+    let next_char_index = start + num_of_hashtags + 1;
+    if bytes[next_char_index] != b' ' {
+        return paragraph(bytes, start, current);
+    }
+
     *current += 1; 
-    while peek(bytes, *current) != b'\n' {
+    while peek(bytes, *current) != b'\n' && peek(bytes, *current) != b'\0'{
         *current += 1;
     }
 
@@ -78,31 +95,59 @@ fn header(b: u8, bytes: &[u8], start: usize, current: &mut usize) -> Option<Toke
             Err(e) => None,
         }
     } else {
-        Some(Token { text: "".to_string(), tag: Tag::P })
+        paragraph(bytes, start, current)
     }
+}
+
+#[test]
+fn test_paragraph() {
+    let source = "this is a paragraph.
+        this is a separate one.";
+
+    let expected = vec![
+        Token { text: "this is a paragraph.".to_string(),tag: Tag::P },
+        Token { text: "this is a separate one.".to_string(), tag: Tag::P },
+    ];
+
+    let mut tokens: Vec<Token> = vec![]; 
+    scan(&mut tokens, source);
+
+    assert_eq!(tokens, expected);
 }
  
 #[test]
 fn test_header() {
-    let source = "
+    let source = " 
         # header 1
+
         ## header 2
+
         ### header 3
+
         #### header 4
+
         ##### header 5
+
         ###### header 6
         
         ### this is a longer header
+
         # this is a header with a #hashtag in the middle
         
         # header 1 #
+
         ## header 2 ##
+
         ### header 3 ###
+
         #### header 4 ####
+
         ##### header 5 #####
+
         ###### header 6 ######
 
         ####### not a header
+
         #not a header
         ";
 
@@ -124,13 +169,13 @@ fn test_header() {
     Token { text: "header 4".to_string(), tag: Tag::H(4) },
     Token { text: "header 5".to_string(), tag: Tag::H(5) },
     Token { text: "header 6".to_string(), tag: Tag::H(6) },
-    Token { text: "#######not a header".to_string(), tag: Tag::P },
+    Token { text: "####### not a header".to_string(), tag: Tag::P },
     Token { text: "#not a header".to_string(), tag: Tag::P },
     Token { text: String::new(), tag: Tag::EOF },
     ];
 
     for (i, t) in tokens.iter().enumerate() {
         let e = &expected[i];
-        assert_eq!(expected[i], *t);
+        assert_eq!(expected[i], *t, "assertion failure on tokens[{i}]");
     }
 }
