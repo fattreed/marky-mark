@@ -29,7 +29,7 @@ pub fn scan(tokens: &mut Vec<Token>, source: &str) {
             _ => paragraph(bytes, start, &mut current),
         };
         
-        token.map_or((), |t| tokens.push(t))
+        token.map_or((), |t| tokens.push(t));
     }
 }
 
