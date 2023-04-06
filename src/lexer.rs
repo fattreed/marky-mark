@@ -16,7 +16,7 @@ pub fn scan_file(path: &str) -> Vec<Token> {
 }
 
 pub fn scan(tokens: &mut Vec<Token>, source: &str) {
-    let mut bytes = source.as_bytes();
+    let bytes = source.as_bytes();
     let mut start: usize;
     let mut current: usize = 0;
     while current < bytes.len() - 1 {
@@ -92,7 +92,7 @@ fn header(bytes: &[u8], start: usize, current: &mut usize) -> Option<Token> {
                     .to_string();
                 Some(Token { text: header, tag: Tag::H(num_of_hashtags) })
             }
-            Err(e) => None,
+            Err(_e) => None,
         }
     } else {
         paragraph(bytes, start, current)
@@ -175,7 +175,6 @@ fn test_header() {
     ];
 
     for (i, t) in tokens.iter().enumerate() {
-        let e = &expected[i];
         assert_eq!(expected[i], *t, "assertion failure on tokens[{i}]");
     }
 }
