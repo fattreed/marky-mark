@@ -29,14 +29,11 @@ pub fn scan(tokens: &mut Vec<Token>, source: &str) {
             _ => paragraph(bytes, start, &mut current),
         };
         
-        match token {
-            Some(t) => tokens.push(t),
-            None => (),
-        }
+        token.map_or((), |t| tokens.push(t))
     }
 }
 
-fn peek(bytes: &[u8], current: usize) -> u8 {  
+const fn peek(bytes: &[u8], current: usize) -> u8 {  
     if current < bytes.len() - 1 {
         bytes[current + 1]
     } else {
@@ -52,10 +49,7 @@ fn paragraph(bytes: &[u8], start: usize, current: &mut usize) -> Option<Token> {
     let p_bytes = &bytes[start..=*current];
     let text = String::from_utf8(p_bytes.to_vec());
     
-    match text {
-        Ok(t) => Some(Token { text: t.trim().to_string(), tag: Tag::P }),
-        Err(_) => None,
-    }
+    text.map_or(None, |t| Some(Token { text: t.trim().to_string(), tag: Tag::P }))
 }
 
 fn header(bytes: &[u8], start: usize, current: &mut usize) -> Option<Token> {
