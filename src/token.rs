@@ -8,7 +8,10 @@ pub struct Token {
 pub enum Tag {
     H(usize),
     
-    P, A, IMG, UL, OL,
+    P, A, IMG, 
+
+    UL(Vec<String>), OL(Vec<String>),
 
     EOF
 }
+

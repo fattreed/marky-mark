@@ -25,7 +25,29 @@ pub fn scan(tokens: &mut Vec<Token>, source: &str) {
         let b = bytes[current];
         let token = match b {
             b'#' => header(bytes, start, &mut current),
-            b'\t' | b' ' | b'\r'| b'\n' => None,
+            b'*' => {
+                if peek(bytes, current) == b' ' {
+                    let mut lines: Vec<String> = vec![];
+                    unordered_list(bytes, start, &mut current, b'*', &mut lines)
+                } else {
+                    //bold
+                    None
+                }
+            } 
+            b'-' => {
+                if peek(bytes, current) == b'-' && peek_next(bytes, current) == b'-' {
+                    //hr
+                    None
+                } else {
+                    let mut lines: Vec<String> = vec![];
+                    unordered_list(bytes, start, &mut current, b'-', &mut lines)
+                }
+            }
+            b'+' => {
+                let mut lines: Vec<String> = vec![];
+                unordered_list(bytes, start, &mut current, b'+', &mut lines)
+            }
+            b'\t' | b' ' | b'\r' | b'\n' => None, 
             _ => paragraph(bytes, start, &mut current),
         };
         
@@ -39,6 +61,23 @@ const fn peek(bytes: &[u8], current: usize) -> u8 {
     } else {
         b'\0'
     }
+}
+
+const fn peek_next(bytes: &[u8], current: usize) -> u8 {
+    if current < bytes.len() - 2 {
+        bytes[current + 2]
+    } else {
+        b'\0'
+    }
+}
+
+fn peek_line(bytes: &[u8], current: usize) -> u8 {
+    let mut current_copy = current.clone();
+    while bytes[current_copy] != b'\n' {
+        current_copy += 1;
+    }
+
+    bytes[current]
 }
 
 fn paragraph(bytes: &[u8], start: usize, current: &mut usize) -> Option<Token> {
@@ -90,6 +129,39 @@ fn header(bytes: &[u8], start: usize, current: &mut usize) -> Option<Token> {
         }
     } else {
         paragraph(bytes, start, current)
+    }
+}
+
+fn unordered_list(bytes: &[u8], start: usize, current: &mut usize, delimiter: u8, lines: &mut Vec<String>) -> Option<Token> {
+    advance_line(bytes, current);
+
+    let text = String::from_utf8(bytes[start + 3..*current].to_vec()).expect("");
+
+    lines.push(text);
+    advance_line(bytes, current);
+
+    advance_whitespace(bytes, current);
+    let next = String::from_utf8(bytes[*current..].to_vec()); 
+    println!("next: {next:?}");
+    if bytes[*current] == delimiter && peek(bytes, *current) == b' ' {
+        unordered_list(bytes, *current, current, delimiter, lines);
+        None
+    } else {
+        let tag = Tag::UL(lines.to_vec());
+        Some(Token { text: "".to_string(), tag })
+    }
+}
+
+fn advance_line(bytes: &[u8], current: &mut usize) { 
+    while bytes[*current] != b'\n' {
+        *current += 1;
+    }
+    advance_whitespace(bytes, current);
+}
+
+fn advance_whitespace(bytes: &[u8], current: &mut usize) {
+    while *current < bytes.len() - 1 && (bytes[*current] == b'\t' || bytes[*current] == b'\r' || bytes[*current] == b' ') {
+        *current += 1;
     }
 }
 
@@ -170,5 +242,49 @@ fn test_header() {
 
     for (i, t) in tokens.iter().enumerate() {
         assert_eq!(expected[i], *t, "assertion failure on tokens[{i}]");
+    }
+}
+
+#[test]
+fn test_unordered_list() {
+    let source = "
+    - this a dash list
+    - to make a dash list
+    - use dashes STOOOPID
+
+    * this a star list
+    * to make a star list
+    * use stars STOOOPID
+
+    + this a plus list
+    + to make a plus list
+    + use pluses STOOOPID
+    ";
+
+    let expected = vec![
+        Token { text: String::new(), 
+            tag: Tag::UL(vec![
+            "this a dash list".to_string(), 
+            "to make a dash list".to_string(),
+            "use dashes STOOOPID".to_string(),
+        ])},
+        Token { text: String::new(), 
+            tag: Tag::UL(vec![
+            "this a star list".to_string(),
+            "to make a star list".to_string(),
+            "use stars STOOOPID".to_string(),
+        ])},
+        Token { text: String::new(), tag: Tag::UL(vec![
+            "this a plus list".to_string(),
+            "to make a plus list".to_string(),
+            "use pluses STOOOPID".to_string(),
+        ])},
+    ];
+
+    let mut tokens = vec![];
+    scan(&mut tokens, source);
+
+    for (i, e) in expected.iter().enumerate() {
+        assert_eq!(e, &tokens[i]);
     }
 }
