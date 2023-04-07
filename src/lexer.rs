@@ -142,7 +142,6 @@ fn unordered_list(bytes: &[u8], start: usize, current: &mut usize, delimiter: u8
 
     advance_whitespace(bytes, current);
     let next = String::from_utf8(bytes[*current..].to_vec()); 
-    println!("next: {next:?}");
     if bytes[*current] == delimiter && peek(bytes, *current) == b' ' {
         unordered_list(bytes, *current, current, delimiter, lines);
         None
@@ -156,7 +155,9 @@ fn advance_line(bytes: &[u8], current: &mut usize) {
     while bytes[*current] != b'\n' {
         *current += 1;
     }
-    advance_whitespace(bytes, current);
+    if *current < bytes.len() - 1 {
+        *current += 1;
+    }
 }
 
 fn advance_whitespace(bytes: &[u8], current: &mut usize) {
@@ -285,6 +286,8 @@ fn test_unordered_list() {
     scan(&mut tokens, source);
 
     for (i, e) in expected.iter().enumerate() {
-        assert_eq!(e, &tokens[i]);
+        let t = &tokens[i];
+        println!("expected: {e:?} actual: {t:?}");
+        assert_eq!(e, t);
     }
 }
